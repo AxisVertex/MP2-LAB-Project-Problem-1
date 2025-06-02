@@ -8,6 +8,7 @@ Library::Library() {
     mainUserIsLoggedIn = false;
     continueRunning = true;
 
+    books.reserve(17);
     users.reserve(11);
 
     InitializeBooks();
@@ -55,13 +56,43 @@ void Library::MainLoop() {
 
 // testing purposes
 void Library::InitializeBooks() {
-    std::cout << "Books iniliatized" << std::endl;
+    // std::lock_guard<std::mutex> lock(simUserBorrowBookMutex);
+
     books.push_back(Book(bookIdCount, "Test title 1", "Unknown author", "Unknown genre", 2025));
     bookIdCount++;
     books.push_back(Book(bookIdCount, "Test title 2", "Unknown author", "Unknown genre", 2025));
     bookIdCount++;
     books.push_back(Book(bookIdCount, "Test title 3", "Unknown author", "Unknown genre", 2025));
     bookIdCount++;
+    books.push_back(Book(bookIdCount, "To Kill a Mockingbird", "Harper Lee", "Fiction", 1960));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "1984", "George Orwell", "Dystopian", 1949));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "The Great Gatsby", "F. Scott Fitzgerald", "Classic", 1925));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "Pride and Prejudice", "Jane Austen", "Romance", 1813));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "The Hobbit", "J.R.R. Tolkien", "Fantasy", 1937));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "Moby Dick", "Herman Melville", "Adventure", 1851));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "The Catcher in the Rye", "J.D. Salinger", "Coming-of-Age", 1951));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "Fahrenheit 451", "Ray Bradbury", "Science Fiction", 1953));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "Brave New World", "Aldous Huxley", "Dystopian", 1932));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "Jane Eyre", "Charlotte Brontë", "Gothic", 1847));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "The Lord of the Rings", "J.R.R. Tolkien", "Fantasy", 1954));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "Crime and Punishment", "Fyodor Dostoevsky", "Philosophical Fiction", 1866));
+    bookIdCount++;
+    books.push_back(Book(bookIdCount, "The Alchemist", "Paulo Coelho", "Adventure", 1988));
+    bookIdCount++;
+
+    std::cout << bookIdCount << std::endl;
+    std::cout << "Books iniliatized" << std::endl;
 }
 
 // User methods //
@@ -631,9 +662,12 @@ void Library::SimulatedUserBorrowBook(int id, User& simUser) {
 
     if (simUser.HasAlreadyBorrowed() == false) {
         if (books[id].IsAvailable()) {
+            // std::cout << "User " << simUser.GetName() << " Has borrowed book " << books[id].GetId() << " | " << books[id].GetName() << std::endl;
             simUser.BorrowBook(books[id].Borrowed(simUser.GetId(), simUser.GetName()), books[id].GetName());
         } 
     }
+
+     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
 }
 
@@ -641,6 +675,7 @@ void Library::SimulatedUserReturnBook(User& simUser) {
     std::lock_guard<std::mutex> lock(simUserReturnBookMutex);
 
     if (simUser.HasAlreadyBorrowed()) {
+        // std::cout << "User " << simUser.GetName() << " Has returned book " << simUser.GetBorrowedBookName() << std::endl;
         books[simUser.ReturnBook() - 1].Returned();
     }
 
@@ -655,35 +690,24 @@ void Library::UserSimulation(std::string testName, std::string testPass) {
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> actionDist(0, 1); // 0=borrow, 1=return
+    std::uniform_int_distribution<> actionDist(0, 1); // 0=borrow/return, 1 = do nothing
     std::uniform_int_distribution<> bookDist(0, books.size());
     std::uniform_int_distribution<> timeDist(0, 1); // 0 = 5 sec, 1 = 10 sec
 
     for (int i = 0; i < 10; ++i) { // simulate 10 actions per user
         
-        int action = actionDist(gen);
+        int action = actionDist(gen); 
 
-        if (simUserAccount.HasAlreadyBorrowed()) 
-            action = 1;
-        
-
-        switch (action) {
-            case 0: {
+        if (action == 0) {
+            
+            if (simUserAccount.HasAlreadyBorrowed() == false) {
                 int bookId = bookDist(gen);
-
                 SimulatedUserBorrowBook(bookId, simUserAccount);
-                
-                break;
             }
-                
-            case 1: {
-
+            else
                 SimulatedUserReturnBook(simUserAccount);
-                
-                break;
-            }
-                
         }
+
 
         int timeDelay = timeDist(gen);
 
