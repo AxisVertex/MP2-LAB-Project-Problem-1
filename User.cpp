@@ -29,8 +29,8 @@ void User::BorrowBook(int bookId, std::string bookName) {
 }
 
 int User::ReturnBook() {
-    borrowedBookName = "None";
     hasBorrowedBook = false;
+    borrowedBookName = "None";
     return borrowedBookId;
 }
 

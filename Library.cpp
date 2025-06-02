@@ -8,7 +8,7 @@ Library::Library() {
     mainUserIsLoggedIn = false;
     continueRunning = true;
 
-    books.reserve(17);
+    books.reserve(16);
     users.reserve(11);
 
     InitializeBooks();
@@ -56,7 +56,6 @@ void Library::MainLoop() {
 
 // testing purposes
 void Library::InitializeBooks() {
-    // std::lock_guard<std::mutex> lock(simUserBorrowBookMutex);
 
     books.push_back(Book(bookIdCount, "Test title 1", "Unknown author", "Unknown genre", 2025));
     bookIdCount++;
@@ -91,13 +90,12 @@ void Library::InitializeBooks() {
     books.push_back(Book(bookIdCount, "The Alchemist", "Paulo Coelho", "Adventure", 1988));
     bookIdCount++;
 
-    std::cout << bookIdCount << std::endl;
     std::cout << "Books iniliatized" << std::endl;
 }
 
 // User methods //
 void Library::RegisterUser() {
-    std::lock_guard<std::mutex> lock(createSimUserMutex);
+    std::lock_guard<std::mutex> lock(lockLibrary);
 
     std::cout << "[LOCK STATUS: LOCKED] Registering a new account" << std::endl;
 
@@ -138,7 +136,7 @@ void Library::RegisterUser() {
 }
 
 void Library::UserLogIn() {
-    std::lock_guard<std::mutex> lock(createSimUserMutex);
+    std::lock_guard<std::mutex> lock(lockLibrary);
 
     std::cout << "[LOCK STATUS: LOCKED] user logging in" << std::endl;
 
@@ -188,7 +186,7 @@ void Library::DisplayAllUsers() {
 
 // methods for the books
 void Library::BorrowBook() {
-    std::lock_guard<std::mutex> lock(simUserBorrowBookMutex);
+    std::lock_guard<std::mutex> lock(lockLibrary);
 
     std::cout << "[LOCK STATUS: LOCKED] user borrowing a book" << std::endl;
 
@@ -243,7 +241,7 @@ void Library::BorrowBook() {
 }
 
 void Library::ReturnBook() {
-    std::lock_guard<std::mutex> lock(simUserReturnBookMutex);
+    std::lock_guard<std::mutex> lock(lockLibrary);
 
     std::cout << "[LOCK STATUS: LOCKED] user returning a book" << std::endl;
 
@@ -271,8 +269,8 @@ void Library::DisplayAllBooks() {
 }
 
 void Library::AddBook() {
+    std::lock_guard<std::mutex> lock(lockLibrary);
 
-    std::lock_guard<std::mutex> lock(simUserBorrowBookMutex);
     std::cout << "[LOCK STATUS: LOCKED] Admin adding new a book" << std::endl;
 
     std::string bookName;
@@ -317,7 +315,7 @@ void Library::AddBook() {
 
 void Library::RemoveBook() {
 
-    std::lock_guard<std::mutex> lock(simUserBorrowBookMutex);
+    std::lock_guard<std::mutex> lock(lockLibrary);
 
     std::cout << "[LOCK STATUS: LOCKED] Admin removing a book" << std::endl;
 
@@ -372,7 +370,7 @@ void Library::RemoveBook() {
 
 void Library::UpdateBook() {
 
-    std::lock_guard<std::mutex> lock(simUserBorrowBookMutex);
+    std::lock_guard<std::mutex> lock(lockLibrary);
 
     std::cout << "[LOCK STATUS: LOCKED] Admin updating a book" << std::endl;
     
@@ -644,26 +642,13 @@ void Library::UserAdminMenu() {
 
 }
 
-// user simulation methods
-int Library::RegisterSimulatedUser(std::string name, std::string pass) {
-
-    std::lock_guard<std::mutex> lock(createSimUserMutex);
-    int currentIndex = userIdCount;
-
-    users.push_back(User(userIdCount, name, pass));
-    userIdCount++;
-
-    return currentIndex;
-
-}
-
 void Library::SimulatedUserBorrowBook(int id, User& simUser) {
-    std::lock_guard<std::mutex> lock(simUserBorrowBookMutex);
+    std::lock_guard<std::mutex> lock(lockLibrary);
 
     if (simUser.HasAlreadyBorrowed() == false) {
         if (books[id].IsAvailable()) {
-            // std::cout << "User " << simUser.GetName() << " Has borrowed book " << books[id].GetId() << " | " << books[id].GetName() << std::endl;
             simUser.BorrowBook(books[id].Borrowed(simUser.GetId(), simUser.GetName()), books[id].GetName());
+            std::cout << "User " << simUser.GetName() << " Has borrowed book " << books[id].GetId() << " | " << books[id].GetName() << std::endl;
         } 
     }
 
@@ -672,13 +657,23 @@ void Library::SimulatedUserBorrowBook(int id, User& simUser) {
 }
 
 void Library::SimulatedUserReturnBook(User& simUser) {
-    std::lock_guard<std::mutex> lock(simUserReturnBookMutex);
+    std::lock_guard<std::mutex> lock(lockLibrary);
 
     if (simUser.HasAlreadyBorrowed()) {
-        // std::cout << "User " << simUser.GetName() << " Has returned book " << simUser.GetBorrowedBookName() << std::endl;
-        books[simUser.ReturnBook() - 1].Returned();
+        int returnedId = (simUser.ReturnBook() - 1);
+
+        std::cout << "User " << simUser.GetName() << " Has returned book " << books[returnedId].GetName() << std::endl;
+        // std::cout << returnedId << std::endl;
+
+        if (returnedId >= 0 && returnedId < books.size()) 
+            books[returnedId].Returned();
+        else {
+            // std::cerr << "[ERROR] Book ID out of bounds: " << returnedId << " (Books size: " << books.size() << ")\n";
+        }
+
     }
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 }
 
 // void Library::
@@ -686,12 +681,18 @@ void Library::SimulatedUserReturnBook(User& simUser) {
 void Library::UserSimulation(std::string testName, std::string testPass) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1000)); 
 
-    User& simUserAccount = users[RegisterSimulatedUser(testName, testPass)];
+    // User& simUserAccount = users[RegisterSimulatedUser(testName, testPass)];
+    lockLibrary.lock();
+    users.emplace_back(userIdCount, testName, testPass); // Construct in-place
+    User& simUserAccount = users.back(); // Get a reference to the newly added user
+    userIdCount++;
+
+    lockLibrary.unlock();
 
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> actionDist(0, 1); // 0=borrow/return, 1 = do nothing
-    std::uniform_int_distribution<> bookDist(0, books.size());
+    std::uniform_int_distribution<> bookDist(0, books.size() - 1);
     std::uniform_int_distribution<> timeDist(0, 1); // 0 = 5 sec, 1 = 10 sec
 
     for (int i = 0; i < 10; ++i) { // simulate 10 actions per user
@@ -702,7 +703,7 @@ void Library::UserSimulation(std::string testName, std::string testPass) {
             
             if (simUserAccount.HasAlreadyBorrowed() == false) {
                 int bookId = bookDist(gen);
-                SimulatedUserBorrowBook(bookId, simUserAccount);
+                SimulatedUserBorrowBook(bookId,simUserAccount);
             }
             else
                 SimulatedUserReturnBook(simUserAccount);

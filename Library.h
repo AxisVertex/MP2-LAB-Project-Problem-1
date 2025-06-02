@@ -27,9 +27,10 @@ private:
 
     bool continueRunning;
 
-    std::mutex createSimUserMutex;
-    std::mutex simUserBorrowBookMutex;
-    std::mutex simUserReturnBookMutex;
+    std::mutex lockLibrary;
+    // std::mutex createSimUserMutex;
+    // std::mutex simUserBorrowBookMutex;
+    // std::mutex simUserReturnBookMutex;
 
 public:
     Library();

@@ -60,6 +60,6 @@ int Book::Borrowed(int id, std::string userName) {
 
 void Book::Returned() {
     borrowedById = 0;
-    borrowedByName = "No one";
+    borrowedByName = "No one"; // segmentation fault
     available = true;
 }
